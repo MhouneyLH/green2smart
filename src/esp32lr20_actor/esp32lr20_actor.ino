@@ -15,19 +15,29 @@ const char* MQTT_PASSWORD = "root";
 const char* MQTT_CLIENT_ID = "mqtt_esp32lr20";
 
 const char* ARDUINO_NANO_TOPIC_STATE = "arduinoEnvironment/state";
+const char* WATER_LEVEL_TOPIC_STATE = "waterLevel/state";
 
 // relay
 const int RELAY_PIN_1 = 33;
 const int RELAY_PIN_2 = 25;
 
 // pump
-const long PUMP_INTERVAL_INACTIVE_AS_MS = 60000 * 60 * 3; // 3h
-const long PUMP_INTERVAL_ACTIVE_AS_MS = 60000 * 7; // 7min
+const unsigned long PUMP_INTERVAL_INACTIVE_AS_MS = 1000 * 60 * 60 * 3; // 3h
+const unsigned long PUMP_INTERVAL_ACTIVE_AS_MS = 1000 * 60 * 7; // 7min
 const float MIN_WATER_LEVEL = 20.0;
 const float MAX_WATER_LEVEL = 100.0;
+const int WATER_LEVEL_BUFFER_SIZE = 5;
+const float WATER_LEVEL_REFILL_THRESHOLD = 10.0;
+
+struct WaterLevelEntry {
+  float level;
+  unsigned long timestamp;
+} WaterLevelEntry;
 
 unsigned long pumpPreviousTimeAsMs = 0;
 bool isPumpActive = false;
+int waterLevelBufferIndex = 0;
+WaterLevelEntry waterLevelBuffer[WATER_LEVEL_BUFFER_SIZE];
 
 // light
 const int MIN_BRIGHTNESS_AS_LUME = 1400;
@@ -46,6 +56,7 @@ void setup() {
 
   setupMQTT();
   setupPins();
+  setupWaterLevelBuffer();
 
   connectWiFi();
   connectMQTT();
@@ -71,6 +82,13 @@ void setupPins() {
 
   digitalWrite(RELAY_PIN_1, LOW);
   digitalWrite(RELAY_PIN_2, LOW);
+}
+
+void setupWaterLevelBuffer() {
+  for (int i = 0; i < WATER_LEVEL_BUFFER_SIZE; i++) {
+    waterLevelBuffer[i].level = -1.0;
+    waterLevelBuffer[i].timestamp = 0;
+  }
 }
 
 void connectWiFi() {
@@ -137,8 +155,26 @@ void onMessageIncomingCallback(char* topic, byte* payload, unsigned int length) 
   if(String(topic) == ARDUINO_NANO_TOPIC_STATE) {
     const JsonObject jsonObject = getJSONObject(payload, length);
     const float brightness = jsonObject["brightness"];
-
     handleLight(brightness);
+  }
+  else if(String(topic) == WATER_LEVEL_TOPIC_STATE) {
+    const JsonObject jsonObject = getJSONObject(payload, length);
+    const float waterLevel = jsonObject["waterLevel"];
+
+    if(waterLevelBufferIndex > 0) {
+      if (isWaterRefilled(waterLevel)) {
+        activatePump();
+        pumpPreviousTimeAsMs = 0;
+
+        Serial.println("Water refill detected!");
+      }
+    }
+
+    updateWaterLevelBuffer(waterLevel);
+  }
+  else {
+    Serial.print("No handler for this topic: ");
+    Serial.println(topic);
   }
 }
 
@@ -155,7 +191,6 @@ void printIncomingMessage(char* topic, byte* payload, unsigned int length) {
 }
 
 JsonObject getJSONObject(byte* payload, unsigned int length) {
-  // TODO: adjust those numbers
   char messageBuffer[length + 1];
   DynamicJsonDocument doc(1024);
 
@@ -183,4 +218,17 @@ void handleLight(const float brightness) {
 
 bool isEnoughLight(const float brightness) {
   return brightness >= MIN_BRIGHTNESS_AS_LUME;
+}
+
+bool isWaterRefilled(const float waterLevel) {
+  const float previousWaterLevel = waterLevelBuffer[(waterLevelBufferIndex - 1) % WATER_LEVEL_BUFFER_SIZE].level;
+  const float diff = abs(waterLevel - previousWaterLevel);
+
+  return diff >= WATER_LEVEL_REFILL_THRESHOLD;
+}
+
+void updateWaterLevelBuffer(const float waterLevel) {
+  waterLevelBuffer[waterLevelBufferIndex].level = waterLevel;
+  waterLevelBuffer[waterLevelBufferIndex].timestamp = millis();
+  waterLevelBufferIndex = (waterLevelBufferIndex + 1) % WATER_LEVEL_BUFFER_SIZE;
 }
