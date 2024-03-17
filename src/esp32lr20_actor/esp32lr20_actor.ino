@@ -15,6 +15,7 @@ const char* MQTT_PASSWORD = "root";
 const char* MQTT_CLIENT_ID = "mqtt_esp32lr20";
 
 const char* ARDUINO_NANO_TOPIC_STATE = "arduinoEnvironment/state";
+// TODO: adjust correct topic name
 const char* WATER_LEVEL_TOPIC_STATE = "waterLevel/state";
 
 // relay
@@ -29,6 +30,8 @@ const float MAX_WATER_LEVEL = 100.0;
 const int WATER_LEVEL_BUFFER_SIZE = 5;
 const float WATER_LEVEL_REFILL_THRESHOLD = 10.0;
 
+// todo: add checks for too less water and stuff like this
+
 struct WaterLevelEntry {
   float level;
   unsigned long timestamp;
@@ -41,6 +44,8 @@ WaterLevelEntry waterLevelBuffer[WATER_LEVEL_BUFFER_SIZE];
 
 // light
 const int MIN_BRIGHTNESS_AS_LUME = 1400;
+const unsigned int LIGHT_TIMESPAN_START_AS_HOUR = 8;
+const unsigned int LIGHT_TIMESPAN_END_AS_HOUR = 20;
 
 // logging
 const bool IS_PRINTING_INCOMING_MESSAGES = true;
@@ -208,12 +213,31 @@ JsonObject getJSONObject(byte* payload, unsigned int length) {
 }
 
 void handleLight(const float brightness) {
-  if(!isEnoughLight(brightness)) {
-    digitalWrite(RELAY_PIN_2, HIGH);
+  // TODO: use real time stuff (rtc)
+  if(!isInLightTimespan(15)) {
+    deactivateLight();
     return;
   }
 
+  if(isEnoughLight(brightness)) {
+    deactivateLight();
+    return;
+  }
+
+  activateLight();
+}
+
+void activateLight() {
+  digitalWrite(RELAY_PIN_2, HIGH);
+}
+
+void deactivateLight() {
   digitalWrite(RELAY_PIN_2, LOW);
+}
+
+bool isInLightTimespan(const unsigned int currentHour) {
+  return (currentHour >= LIGHT_TIMESPAN_START_AS_HOUR) &&
+         (currentHour <= LIGHT_TIMESPAN_END_AS_HOUR);
 }
 
 bool isEnoughLight(const float brightness) {
