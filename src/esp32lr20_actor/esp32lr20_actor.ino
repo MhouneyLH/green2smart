@@ -142,7 +142,6 @@ void handlePump() {
   }
 
   const unsigned long pumpCurrentTimeAsMs = millis();
-
   if (!isPumpActive && isTimerOver(pumpCurrentTimeAsMs, pumpPreviousTimeAsMs, PUMP_INTERVAL_INACTIVE_AS_MS)) {
     activatePump();
     pumpPreviousTimeAsMs = pumpCurrentTimeAsMs;
