@@ -92,7 +92,8 @@ void setupPins() {
 
 void setupWaterLevelBuffer() {
   for (int i = 0; i < WATER_LEVEL_BUFFER_SIZE; i++) {
-    waterLevelBuffer[i].level = -1.0;
+    // TODO: init with -1
+    waterLevelBuffer[i].level = 100.0;
     waterLevelBuffer[i].timestamp = 0;
   }
 }
