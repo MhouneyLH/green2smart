@@ -28,7 +28,7 @@ void loop() {
   const float temperature = HS300x.readTemperature();
   const float humidity = HS300x.readHumidity();
 
-  while (! APDS.colorAvailable()) {
+  while (!APDS.colorAvailable()) {
     delay(5);
   }
 

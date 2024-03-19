@@ -15,8 +15,9 @@ const char* MQTT_PASSWORD = "root";
 const char* MQTT_CLIENT_ID = "mqtt_esp32lr20";
 
 const char* ARDUINO_NANO_TOPIC_STATE = "arduinoEnvironment/state";
-// TODO: adjust correct topic name
 const char* WATER_LEVEL_TOPIC_STATE = "waterLevel/state";
+const char* PI_TIME_TOPIC = "pi/time";
+const char* PUMP_TOPIC_STATE = "esp32lr20/pump/state";
 
 // relay
 const int RELAY_PIN_1 = 33;
@@ -35,7 +36,7 @@ const float WATER_LEVEL_REFILL_THRESHOLD = 10.0;
 struct WaterLevelEntry {
   float level;
   unsigned long timestamp;
-} WaterLevelEntry;
+};
 
 unsigned long pumpPreviousTimeAsMs = 0;
 bool isPumpActive = false;
@@ -43,9 +44,10 @@ int waterLevelBufferIndex = 0;
 WaterLevelEntry waterLevelBuffer[WATER_LEVEL_BUFFER_SIZE];
 
 // light
-const int MIN_BRIGHTNESS_AS_LUME = 1400;
+const int MIN_BRIGHTNESS_AS_LUME = 800;
 const unsigned int LIGHT_TIMESPAN_START_AS_HOUR = 8;
 const unsigned int LIGHT_TIMESPAN_END_AS_HOUR = 20;
+unsigned int currentHour = 0;
 
 // logging
 const bool IS_PRINTING_INCOMING_MESSAGES = true;
@@ -57,7 +59,7 @@ PubSubClient client(wifiClient);
 void setup() {
   Serial.begin(115200);
   while (!Serial);
-  // delay(5000);
+  delay(100);
 
   setupMQTT();
   setupPins();
@@ -65,6 +67,8 @@ void setup() {
 
   connectWiFi();
   connectMQTT();
+
+  activatePump();
 }
 
 void loop() {
@@ -125,6 +129,12 @@ void connectMQTT() {
   }
 }
 
+void publishMQTTMessage(const char* topic, const char* payload) {
+  client.publish(topic, payload);
+  Serial.print("Published message: ");
+  Serial.println(payload);
+}
+
 void handlePump() {
   const unsigned long pumpCurrentTimeAsMs = millis();
 
@@ -141,11 +151,13 @@ void handlePump() {
 void activatePump() {
   isPumpActive = true;
   digitalWrite(RELAY_PIN_1, HIGH);
+  publishMQTTMessage(PUMP_TOPIC_STATE, "pump: on");
 }
 
 void deactivatePump() {
   isPumpActive = false;
   digitalWrite(RELAY_PIN_1, LOW);
+  publishMQTTMessage(PUMP_TOPIC_STATE, "pump: off");
 }
 
 bool isTimerOver(const unsigned long current, const unsigned long previous, const long interval) {
@@ -154,7 +166,7 @@ bool isTimerOver(const unsigned long current, const unsigned long previous, cons
 
 void onMessageIncomingCallback(char* topic, byte* payload, unsigned int length) {
   if(IS_PRINTING_INCOMING_MESSAGES) {
-    printIncomingMessage();
+    printIncomingMessage(topic, payload, length);
   }
 
   if(String(topic) == ARDUINO_NANO_TOPIC_STATE) {
@@ -176,6 +188,10 @@ void onMessageIncomingCallback(char* topic, byte* payload, unsigned int length) 
     }
 
     updateWaterLevelBuffer(waterLevel);
+  }
+  else if(String(topic) == PI_TIME_TOPIC) {
+    const JsonObject jsonObject = getJSONObject(payload, length);
+    currentHour = jsonObject["hour"];
   }
   else {
     Serial.print("No handler for this topic: ");
@@ -213,8 +229,7 @@ JsonObject getJSONObject(byte* payload, unsigned int length) {
 }
 
 void handleLight(const float brightness) {
-  // TODO: use real time stuff (rtc)
-  if(!isInLightTimespan(15)) {
+  if(!isInLightTimespan(currentHour)) {
     deactivateLight();
     return;
   }
