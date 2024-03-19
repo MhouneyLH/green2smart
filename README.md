@@ -12,6 +12,34 @@ The "Green2Smart" 2024 science camp in Erfurt (Thuringia) organized by ProTELC, 
 
 <p align="right">(<a href="#readme_top">back to top</a>)</p>
 
+## What you should know
+
+- non-technical:
+
+  - the plants should not be permanently exposed to draughts (e. g. not in the foyer!)
+  - refill the water about every 2 weeks
+  - water box should be washed out once every 6 months or so, as otherwise salts and dirt will settle on the fertilizer solution
+  - if the plants compete for light (plants growing downwards vs. upwards), pruning may be necessary
+  - top up not only with water, but also with fertilizer solution (if EC value is too low -> see [Website](https://sc2024.ve-plant.com/) for checking the values)
+  - if a plant dies, you can cut off a shoot from another plant and put it back into the pot of the dead plant
+
+- technical:
+
+  - ⚠️ even when the power strip is switched off, 230V still flows through the relays of the ESP32LR20! (if the plugs of the lamp/pump are plugged in) ⚠️
+  - the code for the raspberry pi is written by the team behind the "Green2Smart" science camp 2024 (we just implemented for getting the local time of the raspberry pi for now)
+  - the ip of the raspberry pi is `192.168.20.1`
+  - if you change something for the devices that are connected via wire and send serialize data, you have to reboot the raspberry pi to get the new data
+
+    ```sh
+    ssh pi@192.168.20.1
+
+    sudo reboot
+    ```
+
+  - You can copy files from the pi like this: `scp -r pi@192.168.20.1:/home/pi/Documents/raspberry-pi-hub .`
+
+<p align="right">(<a href="#readme_top">back to top</a>)</p>
+
 ## Getting Started
 
 ### Prerequisites
@@ -48,32 +76,13 @@ The "Green2Smart" 2024 science camp in Erfurt (Thuringia) organized by ProTELC, 
 
 ## Architecture
 
+![](./assets/cross_section.jpeg)
+
 ![](./assets/architecture.drawio.png)
 
 <p align="right">(<a href="#readme_top">back to top</a>)</p>
 
-## Additional information
-
-### What you should know
-
-- non-technical:
-
-  - the plants should not be permanently exposed to draughts (e. g. not in the foyer!)
-  - refill the water about every 2 weeks
-
-- technical:
-
-  - the code for the raspberry pi is written by the team behind the "Green2Smart" science camp 2024 (we just implemented for getting the local time of the raspberry pi for now)
-  - the ip of the raspberry pi is `192.168.20.1`
-  - if you change something for the devices that are connected via wire and send serialize data, you have to reboot the raspberry pi to get the new data
-
-  ```sh
-  ssh pi@192.168.20.1
-
-  sudo reboot
-  ```
-
-### Used plants
+## Used plants
 
 | Plant                          | pH        | EC          |
 | ------------------------------ | --------- | ----------- |
