@@ -26,12 +26,9 @@ const int RELAY_PIN_2 = 25;
 // pump
 const unsigned long PUMP_INTERVAL_INACTIVE_AS_MS = 1000 * 60 * 60 * 3; // 3h
 const unsigned long PUMP_INTERVAL_ACTIVE_AS_MS = 1000 * 60 * 7; // 7min
-const float MIN_WATER_LEVEL = 20.0;
-const float MAX_WATER_LEVEL = 100.0;
+const float MIN_WATER_LEVEL = 15.0;
 const int WATER_LEVEL_BUFFER_SIZE = 5;
 const float WATER_LEVEL_REFILL_THRESHOLD = 10.0;
-
-// todo: add checks for too less water and stuff like this
 
 struct WaterLevelEntry {
   float level;
@@ -136,6 +133,13 @@ void publishMQTTMessage(const char* topic, const char* payload) {
 }
 
 void handlePump() {
+  const float currentWaterLevel = getCurrentWaterLevel();
+  if(currentWaterLevel < MIN_WATER_LEVEL) {
+    Serial.print("Current water level is to low: ");
+    Serial.println(currentWaterLevel);
+    return;
+  }
+
   const unsigned long pumpCurrentTimeAsMs = millis();
 
   if (!isPumpActive && isTimerOver(pumpCurrentTimeAsMs, pumpPreviousTimeAsMs, PUMP_INTERVAL_INACTIVE_AS_MS)) {
@@ -177,17 +181,7 @@ void onMessageIncomingCallback(char* topic, byte* payload, unsigned int length) 
   else if(String(topic) == WATER_LEVEL_TOPIC_STATE) {
     const JsonObject jsonObject = getJSONObject(payload, length);
     const float waterLevel = jsonObject["waterLevel"];
-
-    if(waterLevelBufferIndex > 0) {
-      if (isWaterRefilled(waterLevel)) {
-        activatePump();
-        pumpPreviousTimeAsMs = 0;
-
-        Serial.println("Water refill detected!");
-      }
-    }
-
-    updateWaterLevelBuffer(waterLevel);
+    onWaterLevelMessageReceived(waterLevel);
   }
   else if(String(topic) == PI_TIME_TOPIC) {
     const JsonObject jsonObject = getJSONObject(payload, length);
@@ -259,9 +253,21 @@ bool isEnoughLight(const float brightness) {
   return brightness >= MIN_BRIGHTNESS_AS_LUME;
 }
 
-bool isWaterRefilled(const float waterLevel) {
+void onWaterLevelMessageReceived(const float waterLevel) {
+  updateWaterLevelBuffer(waterLevel);
+
+  if(waterLevelBufferIndex > 0) {
+    if (isWaterRefilled()) {
+      activatePump();
+      pumpPreviousTimeAsMs = millis();
+      Serial.println("Water refill detected!");
+    }
+  }
+}
+
+bool isWaterRefilled() {
   const float previousWaterLevel = waterLevelBuffer[(waterLevelBufferIndex - 1) % WATER_LEVEL_BUFFER_SIZE].level;
-  const float diff = abs(waterLevel - previousWaterLevel);
+  const float diff = abs(getCurrentWaterLevel() - previousWaterLevel);
 
   return diff >= WATER_LEVEL_REFILL_THRESHOLD;
 }
@@ -270,4 +276,12 @@ void updateWaterLevelBuffer(const float waterLevel) {
   waterLevelBuffer[waterLevelBufferIndex].level = waterLevel;
   waterLevelBuffer[waterLevelBufferIndex].timestamp = millis();
   waterLevelBufferIndex = (waterLevelBufferIndex + 1) % WATER_LEVEL_BUFFER_SIZE;
+}
+
+float getCurrentWaterLevel() {
+  if(waterLevelBufferIndex < 0 || waterLevelBufferIndex > WATER_LEVEL_BUFFER_SIZE - 1) {
+    return -1.0;
+  }
+
+  return waterLevelBuffer[waterLevelBufferIndex].level;
 }
