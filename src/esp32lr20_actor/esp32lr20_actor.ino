@@ -18,6 +18,7 @@ const char* ARDUINO_NANO_TOPIC_STATE = "arduinoEnvironment/state";
 const char* WATER_LEVEL_TOPIC_STATE = "waterLevel/state";
 const char* PI_TIME_TOPIC = "pi/time";
 const char* PUMP_TOPIC_STATE = "esp32lr20/pump/state";
+const char* LIGHT_TOPIC_STATE = "esp32lr20/light/state";
 
 // relay
 const int RELAY_PIN_1 = 33;
@@ -238,10 +239,12 @@ void handleLight(const float brightness) {
 
 void activateLight() {
   digitalWrite(RELAY_PIN_2, HIGH);
+  publishMQTTMessage(LIGHT_TOPIC_STATE, "light=on");
 }
 
 void deactivateLight() {
   digitalWrite(RELAY_PIN_2, LOW);
+  publishMQTTMessage(LIGHT_TOPIC_STATE, "light=off");
 }
 
 bool isInLightTimespan(const unsigned int currentHour) {
